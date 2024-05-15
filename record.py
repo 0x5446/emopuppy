@@ -25,7 +25,18 @@ GPIO.setup(LED, GPIO.OUT)
 recording = False
 record_process = None
 
+def cmd(command):
+
+    # 使用subprocess.run()执行命令
+    result = subprocess.run(command, shell=True, capture_output=True, text=True)
+
+    # 输出命令的返回码、标准输出和标准错误
+    print("Return code:", result.returncode)
+    print("Standard output:", result.stdout)
+    print("Standard error:", result.stderr)
+
 def start_recording():
+    cmd("sudo systemctl stop emopuppy_monitor")
     global recording, record_process
     if not recording:
         # 使用 subprocess.Popen 启动 arecord 进程
@@ -62,6 +73,8 @@ def stop_recording(save):
             # 删除录音文件
             os.remove(audio_file)
             print("Recording canceled.")
+
+        cmd("sudo systemctl start emopuppy_monitor")
 
 try:
     while True:
