@@ -20,7 +20,7 @@ def play_audio(filename):
         pygame.time.Clock().tick(10)
 
 
-def is_angry(data, prob=0.3):
+def is_angry(data, prob=0.6):
     if len(data) == 0:
         return False
 
