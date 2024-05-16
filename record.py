@@ -15,7 +15,7 @@ LED = 22
 
 script_path = os.path.realpath(__file__)
 script_dir = os.path.dirname(script_path)
-audio_file = script_dir + '/user_alert.wav'
+audio_file = os.path.join(script_dir, 'user_alert.wav')
 
 # 设置引脚为输入和输出
 GPIO.setup(BUTTON_A, GPIO.IN, pull_up_down=GPIO.PUD_UP)
@@ -26,30 +26,25 @@ recording = False
 record_process = None
 
 def cmd(command):
-
-    # 使用subprocess.run()执行命令
     result = subprocess.run(command, shell=True, capture_output=True, text=True)
-
-    # 输出命令的返回码、标准输出和标准错误
-    print("Return code:", result.returncode)
-    print("Standard output:", result.stdout)
-    print("Standard error:", result.stderr)
+    print(result.stdout)
+    if result.stderr:
+        print(result.stderr)
 
 def start_recording():
-    cmd("sudo systemctl stop emopuppy_monitor")
     global recording, record_process
     if not recording:
-        # 使用 subprocess.Popen 启动 arecord 进程
+        cmd("sudo systemctl stop emopuppy_monitor")
         record_process = subprocess.Popen([
             "arecord",
             "-D", "plughw:2,0",
             "-f", "cd",
             "-t", "wav",
             "-q",
-            "-B", "1000000", # 设置缓冲区大小为1秒
-            "-F", "100000",  # 设置帧大小为0.1秒
+            "-B", "1000000",
+            "-F", "100000",
             audio_file
-            ])
+        ])
         GPIO.output(LED, GPIO.HIGH)
         recording = True
         print("Recording started...")
@@ -57,38 +52,44 @@ def start_recording():
 def stop_recording(save):
     global recording, record_process
     if recording:
-        # 使用 terminate 方法终止录音进程
         record_process.terminate()
         GPIO.output(LED, GPIO.LOW)
         recording = False
         if save:
             print("Recording saved.")
-            # 闪烁 LED 两次表示保存成功
             for _ in range(2):
                 GPIO.output(LED, GPIO.HIGH)
                 time.sleep(0.1)
                 GPIO.output(LED, GPIO.LOW)
                 time.sleep(0.1)
         else:
-            # 删除录音文件
-            os.remove(audio_file)
-            print("Recording canceled.")
+            clear_recording()
 
-        cmd("sudo systemctl start emopuppy_monitor")
+    cmd("sudo systemctl start emopuppy_monitor")
+
+def clear_recording():
+    if os.path.exists(audio_file):
+        os.remove(audio_file)
+        print("Recording canceled.")
+        for _ in range(2):
+            GPIO.output(LED, GPIO.HIGH)
+            time.sleep(0.1)
+            GPIO.output(LED, GPIO.LOW)
+            time.sleep(0.1)
 
 try:
     while True:
         button_a_state = GPIO.input(BUTTON_A)
         button_b_state = GPIO.input(BUTTON_B)
 
-        if button_a_state == GPIO.LOW:
-            if not recording:
-                start_recording()
-            if button_b_state == GPIO.LOW:
-                stop_recording(save=True)
-        else:
-            if recording:
-                stop_recording(save=False)
+        if button_a_state == GPIO.LOW and not recording:
+            start_recording()
+        
+        if button_a_state == GPIO.HIGH and recording:
+            stop_recording(save=True)
+
+        if button_b_state == GPIO.LOW and not recording:
+            clear_recording()
 
         time.sleep(0.1)
 
